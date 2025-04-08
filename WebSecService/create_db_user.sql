@@ -1,0 +1,4 @@
+-- CREATE DATABASE IF NOT EXISTS laravel;
+-- CREATE USER IF NOT EXISTS 'laravel_user'@'localhost' IDENTIFIED BY 'laravel_pass';
+-- GRANT ALL PRIVILEGES ON laravel.* TO 'laravel_user'@'localhost';
+-- FLUSH PRIVILEGES; 

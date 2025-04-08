@@ -1,47 +1,91 @@
 <?php
-use Illuminate\Http\Request;
+
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Web\ProductsController;
-use App\Http\Controllers\Web\UsersController;
-
-Route::get('register', [UsersController::class, 'register'])->name('register');
-Route::post('register', [UsersController::class, 'doRegister'])->name('do_register');
-Route::get('login', [UsersController::class, 'login'])->name('login');
-Route::post('login', [UsersController::class, 'doLogin'])->name('do_login');
-Route::get('logout', [UsersController::class, 'doLogout'])->name('do_logout');
-Route::get('users', [UsersController::class, 'list'])->name('users');
-Route::get('profile/{user?}', [UsersController::class, 'profile'])->name('profile');
-Route::get('users/edit/{user?}', [UsersController::class, 'edit'])->name('users_edit');
-Route::post('users/save/{user}', [UsersController::class, 'save'])->name('users_save');
-Route::get('users/delete/{user}', [UsersController::class, 'delete'])->name('users_delete');
-Route::get('users/edit_password/{user?}', [UsersController::class, 'editPassword'])->name('edit_password');
-Route::post('users/save_password/{user}', [UsersController::class, 'savePassword'])->name('save_password');
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\UsersController;
+use App\Http\Controllers\ProductsController;
+use App\Http\Controllers\AdminController;
+use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\PurchasesController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\EmployeesController;
 
 
 
-Route::get('products', [ProductsController::class, 'list'])->name('products_list');
-Route::get('products/edit/{product?}', [ProductsController::class, 'edit'])->name('products_edit');
-Route::post('products/save/{product?}', [ProductsController::class, 'save'])->name('products_save');
-Route::get('products/delete/{product}', [ProductsController::class, 'delete'])->name('products_delete');
-
+// Public routes
 Route::get('/', function () {
     return view('welcome');
+})->name('home');
+
+// Authentication routes
+Route::get('/register', function () {
+    return view('auth.register');
+})->name('register');
+Route::post('/register', [UsersController::class, 'register'])->name('register.submit');
+Route::get('/login', [UsersController::class, 'login'])->name('login');
+Route::post('/login', [UsersController::class, 'doLogin'])->name('do_login');
+Route::post('/logout', [UsersController::class, 'doLogout'])->name('logout');
+
+// Protected routes
+Route::middleware(['auth'])->group(function () {
+    // User profile and management
+    Route::get('/profile', [UsersController::class, 'profile'])->name('profile');
+    Route::get('/purchase-history', [UsersController::class, 'purchaseHistory'])->name('purchase_history');
+    
+    // User resource routes
+    Route::resource('users', UsersController::class);
+    
+    // Employee and Admin routes
+    Route::middleware(['role:Employee,Admin'])->group(function () {
+        Route::resource('products', ProductsController::class)->except(['index', 'show']);
+        Route::get('/employees/customers', [EmployeesController::class, 'customers'])->name('employees.customers');
+        Route::post('/employees/add-credit/{user}', [EmployeesController::class, 'addCredit'])->name('employees.add_credit');
+        Route::get('/employees/credit-history/{user}', [EmployeesController::class, 'creditHistory'])->name('employees.credit_history');
+        Route::get('/employees/reset/{user}', [EmployeesController::class, 'reset'])->name('employees.reset');
+
+    });
+
+    // Admin only routes
+    Route::middleware(['role:Admin'])->group(function () {
+        Route::resource('employees', EmployeesController::class);
+        Route::get('/admin/create-employee', [AdminController::class, 'createEmployee'])->name('admin.create_employee');
+        Route::post('/admin/create-employee', [AdminController::class, 'storeEmployee'])->name('admin.store_employee');
+    });
+
+    // Product routes
+    Route::middleware(['permission:add_products,edit_products,delete_products'])->group(function () {
+        Route::get('products/create', [ProductController::class, 'create'])->name('products.create');
+        Route::post('products', [ProductController::class, 'store'])->name('products.store');
+        Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
+        Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update');
+        Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+    });
+
+    // Public product routes (viewing)
+    Route::get('products', [ProductController::class, 'index'])->name('products.index');
+    Route::get('products/{product}', [ProductController::class, 'show'])->name('products.show');
+
+    // Protected product routes (buying)
+    Route::post('products/{product}/buy', [ProductController::class, 'buy'])->name('products.buy');
 });
 
-Route::get('/multable', function (Request $request) {
-    $j = $request->number??5;
-    $msg = $request->msg;
-    return view('multable', compact("j", "msg"));
-});
+// Public product routes
+Route::resource('products', ProductsController::class)->only(['index', 'show']);
 
-Route::get('/even', function () {
-    return view('even');
-});
+// WebSecTest routes
+Route::get('/multable', function () { return view('multable'); });
+Route::get('/even', function () { return view('even'); });
+Route::get('/prime', function () { return view('prime'); });
+Route::get('/test', function () { return view('test'); });
 
-Route::get('/prime', function () {
-    return view('prime');
-});
+Route::get('/purchases', [PurchasesController::class, 'index'])->name('purchases.index');
 
-Route::get('/test', function () {
-    return view('test');
-});
+Route::post('/logout', function () {
+    Auth::logout();
+    return redirect('/');
+})->name('logout');
+
+Route::get('/home', [HomeController::class, 'index'])->name('home');
